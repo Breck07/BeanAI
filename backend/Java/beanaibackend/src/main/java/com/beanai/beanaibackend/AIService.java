@@ -1,5 +1,6 @@
 package com.beanai.beanaibackend;
 
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -8,7 +9,8 @@ import org.springframework.web.client.RestClient;
 public class AIService {
     //Initialze RestClient and build the Client
     private final RestClient aiClient = RestClient.builder()
-        .baseUrl("http://localhost:8000")
+        .requestFactory(new SimpleClientHttpRequestFactory())
+        .baseUrl("http://127.0.0.1:8000")
         .defaultHeader("Accept", "application/json")
         .build();
 
