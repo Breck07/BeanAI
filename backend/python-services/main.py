@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from ollama import chat, ChatResponse #import ollama library
+from fastapi.responses import StreamingResponse
+from ollama import chat, ChatResponse, AsyncClient 
 import ollama
 from pydantic import BaseModel
 
@@ -8,20 +9,27 @@ class request_data(BaseModel):
 
 app = FastAPI()
 
-#Map the ai endpoint and take in incoming prompt as param
 @app.post("/ai")
-#Method to send prompt to ollama and return the response
 async def ask_ai(incoming_prompt : request_data):
-    response: ChatResponse = ollama.chat(
-        model = "bean-ai",
-        messages = [
-            {
-                'role' : 'user',
-                'content' : incoming_prompt.prompt,
-            },
-        ],
-        stream=False
-    )
-    return {"response" : response.message.content}
 
+    client = AsyncClient()
     
+    async def stream_generator():
+        response_stream = await client.chat(
+            model = "bean-ai",
+            messages = [
+                {
+                    'role' : 'user',
+                    'content' : incoming_prompt.prompt,
+                },
+            ],
+            stream=True
+        )
+        async for chunk in response_stream:
+            content = chunk.message.content
+            if content: # Only send if the token isn't empty
+                # Format exactly as Server-Sent Events (SSE)
+                yield f"data: {content}\n\n"
+
+    # Changed media_type to text/event-stream
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")

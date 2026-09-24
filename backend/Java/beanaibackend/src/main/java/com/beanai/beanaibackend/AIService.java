@@ -1,25 +1,36 @@
 package com.beanai.beanaibackend;
 
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
-//Service for handling ai
 @Service 
 public class AIService {
-    //Initialze RestClient and build the Client
-    private final RestClient aiClient = RestClient.builder()
-        .requestFactory(new SimpleClientHttpRequestFactory())
+
+    private final WebClient aiClient = WebClient.builder()
         .baseUrl("http://127.0.0.1:8000")
-        .defaultHeader("Accept", "application/json")
+        .defaultHeader("Accept", MediaType.TEXT_EVENT_STREAM_VALUE)
         .build();
 
-    //Method to preform get request
-    public AIResponseDTO getAIResponse(AIRequestDTO requestDTO){
+    public Flux<String> getAIResponse(AIRequestDTO requestDTO){
+        ParameterizedTypeReference<ServerSentEvent<String>> typeRef = 
+                new ParameterizedTypeReference<>() {};
+
         return aiClient.post()
             .uri("/ai")
-            .body(requestDTO)
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(requestDTO)
             .retrieve()
-            .body(AIResponseDTO.class);
+            .bodyToFlux(typeRef)
+
+            //SAFETY CRITICAL: Filter out events that contain no data payload first (like pings or empty structures)
+            .filter(event -> event.data() != null)
+            .map(event -> java.util.Objects.requireNonNull(event.data()))
+            
+            //Filter out empty string tokens if necessary
+            .filter(text -> !text.isEmpty());
     }
 }
